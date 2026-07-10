@@ -12,9 +12,9 @@ const app = express();
 // 1. Trust Proxy (Must be first for Render)
 app.set("trust proxy", 1);
 
-// 2. CORS (Must be BEFORE body/cookie parsers and routes)
+// 2. Dynamic CORS configuration
 app.use(cors({
-    origin: ["http://localhost:5173", "https://interview-ace-eta.vercel.app"],
+    origin: ["http://localhost:5173", "https://interview-ace-mu.vercel.app"], // Make sure this matches your exact Vercel link!
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -36,15 +36,17 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // 5. Google OAuth Specific Routing Endpoints
+// ADDED: The initial trigger route that redirects the user to Google
 app.get('/api/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
 app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: 'http://localhost:5173/login' }),
+    passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login` }),
     (req, res) => {
-        // FIXED: Redirecting to root '/' to match your Home route
-        res.redirect('http://localhost:5173/');
+        // Redirects to your live frontend URL in production, or localhost during development
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/`);
     }
 );
 
