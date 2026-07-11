@@ -12,9 +12,9 @@ const app = express();
 // 1. Trust Proxy (Must be first for Render)
 app.set("trust proxy", 1);
 
-// 2. Dynamic CORS configuration
+// 2. Production-Ready CORS configuration
 app.use(cors({
-    origin: ["http://localhost:5173", "https://interview-ace-mu.vercel.app"], // Make sure this matches your exact Vercel link!
+    origin: ["http://localhost:5173", "https://interview-ace-mu.vercel.app"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -25,44 +25,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// 4. Session & Passport Middleware Stack (Required for OAuth state tracking)
+// 4. Session & Passport Middleware Stack
 app.use(session({
     secret: process.env.SESSION_SECRET || 'interview_ace_secret_key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Set to true if running production on HTTPS
+    cookie: {
+        secure: true, // Crucial for production HTTPS cross-site cookies
+        sameSite: 'none' // Required for cross-domain cookies between Vercel and Render
+    }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 5. Google OAuth Specific Routing Endpoints
-// ADDED: The initial trigger route that redirects the user to Google
-app.get('/api/auth/google',
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login` }),
-    (req, res) => {
-        // Redirects to your live frontend URL in production, or localhost during development
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/`);
-    }
-);
-
-// 6. Application Feature Routes
+// 5. Application Feature Routes 
+// (Google OAuth routes are cleanly handled inside authRouter now)
 const authRouter = require("./routes/auth.routes");
 const interviewRouter = require("./routes/interview.routes");
 
 app.use("/api/auth", authRouter);
 app.use("/api/interview", interviewRouter);
 
-// 7. 404 handler for unmatched routes
+// 6. 404 handler for unmatched routes
 app.use((req, res) => {
     res.status(404).json({ message: "Route not found" });
 });
 
-// 8. Centralized error handler
+// 7. Centralized error handler
 app.use((err, req, res, next) => {
     console.error("Unhandled error:", err);
 
