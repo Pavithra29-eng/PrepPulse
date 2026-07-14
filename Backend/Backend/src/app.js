@@ -10,8 +10,8 @@ app.set("trust proxy", 1);
 
 // 2. Production-Ready CORS configuration
 app.use(cors({
-    origin: ["http://localhost:5173", "https://interview-ace-mu.vercel.app"],
-    credentials: true,
+    origin: "https://preppulse-mu.vercel.app", // Allow your exact frontend domain
+    credentials: true,                          // Allow cookies/headers to pass safely
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
