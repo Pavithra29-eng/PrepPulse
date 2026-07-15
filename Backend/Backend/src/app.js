@@ -37,6 +37,9 @@ app.use(session({
 
 // 5. Intercept Dead Frontend Auth Requests to avoid 404 header drops
 app.get("/api/auth/get-me", (req, res) => {
+    // Explicit safety headers for the direct auth shortcut
+    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
+    res.header("Access-Control-Allow-Credentials", "true");
     return res.status(200).json({ user: { id: "guest", username: "Guest User" } });
 });
 
@@ -46,12 +49,19 @@ app.use("/api/interview", interviewRouter);
 
 // 7. 404 handler for unmatched routes
 app.use((req, res) => {
+    // Inject headers safely so Vercel doesn't read a 404 as a CORS block
+    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
+    res.header("Access-Control-Allow-Credentials", "true");
     res.status(404).json({ message: "Route not found" });
 });
 
 // 8. Centralized error handler
 app.use((err, req, res, next) => {
     console.error("Unhandled error:", err);
+
+    // Inject headers safely so runtime errors aren't hidden behind a browser network drop
+    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
+    res.header("Access-Control-Allow-Credentials", "true");
 
     if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({ message: "Resume file is too large. Maximum allowed size is 3MB." });

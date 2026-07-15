@@ -1,4 +1,4 @@
-const { PDFParse } = require("pdf-parse");
+const pdfParse = require("pdf-parse"); // Correct standard default initialization
 const { generateInterviewReport, generateResumePdf } = require("../services/ai.service");
 const interviewReportModel = require("../models/interviewReport.model");
 
@@ -11,13 +11,14 @@ async function generateInterViewReportController(req, res) {
             return res.status(400).json({ message: "Resume file upload is missing from request." });
         }
 
-        const parser = new PDFParse({ data: req.file.buffer });
+        // Use standard pdf-parse handling directly on the file buffer
         let resumeText;
         try {
-            const result = await parser.getText();
+            const result = await pdfParse(req.file.buffer);
             resumeText = result.text;
-        } finally {
-            await parser.destroy();
+        } catch (pdfError) {
+            console.error("PDF Parsing Inner Error:", pdfError);
+            return res.status(400).json({ message: "Failed to parse text from the uploaded PDF document." });
         }
 
         const { selfDescription, jobDescription } = req.body;
@@ -53,7 +54,6 @@ async function generateInterViewReportController(req, res) {
 async function getInterviewReportByIdController(req, res) {
     try {
         const { interviewId } = req.params;
-        // Removed the user: req.user.id constraint so anyone can fetch it by ID
         const interviewReport = await interviewReportModel.findOne({ _id: interviewId });
 
         if (!interviewReport) {
@@ -77,7 +77,6 @@ async function getInterviewReportByIdController(req, res) {
  */
 async function getAllInterviewReportsController(req, res) {
     try {
-        // Removed { user: req.user.id } filter so everyone can see the public reports list
         const interviewReports = await interviewReportModel.find({})
             .sort({ createdAt: -1 })
             .select("-resume -selfDescription -jobDescription -__v -technicalQuestions -behavioralQuestions -skillGaps -preparationPlan");
@@ -108,10 +107,8 @@ async function generateResumePdfController(req, res) {
 
         const { resume, jobDescription, selfDescription } = interviewReport;
 
-        // Obtains the built, premium styled HTML string code directly from the service layer
         const htmlContent = await generateResumePdf({ resume, jobDescription, selfDescription });
 
-        // Outputs headers to deliver a clean, fast .html web document file attachment
         res.set({
             "Content-Type": "text/html",
             "Content-Disposition": `attachment; filename=tailored_resume_${interviewReportId}.html`,

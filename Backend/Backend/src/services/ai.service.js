@@ -1,11 +1,11 @@
-const { GoogleGenAI } = require("@google/genai")
-const { z } = require("zod")
-const { zodToJsonSchema } = require("zod-to-json-schema")
+const { GoogleGenAI } = require("@google/genai");
+const { z } = require("zod");
+const { zodToJsonSchema } = require("zod-to-json-schema");
 
-// Create instance using your specific environment key
+// Create instance using your environment key
 const ai = new GoogleGenAI({
     apiKey: process.env.GOOGLE_GENAI_API_KEY
-})
+});
 
 // Validation Schema configuration
 const interviewReportSchema = z.object({
@@ -32,7 +32,15 @@ const interviewReportSchema = z.object({
         tasks: z.array(z.string()).describe("List of simple, action-oriented tasks to be done on this day")
     })).describe("A day-wise preparation plan for the candidate to follow"),
     title: z.string().describe("The title of the job for which the interview report is generated"),
-})
+});
+
+// Helper function to extract a clean JSON Schema that Gemini expects
+function getCleanSchema(zodSchema) {
+    const fullSchema = zodToJsonSchema(zodSchema);
+    // Strip out external schema draft metadata properties so Gemini natively reads it as an OpenAPI object
+    const { $schema, additionalProperties, ...cleanSchema } = fullSchema;
+    return cleanSchema;
+}
 
 async function generateInterviewReport({ resume, selfDescription, jobDescription }) {
     const prompt = `Generate a realistic interview preparation report based on the following context details:
@@ -43,29 +51,24 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
                     CRITICAL INSTRUCTIONS:
                     1. Keep all language simple, clear, and extremely easy to understand. Omit abstract jargon.
                     2. Provide direct answers. Do not include meta-commentary, introductory filler text, or external meta-suggestions.
-                    3. For both technical and behavioral fields, ensure the "sampleAnswer" is written dynamically in the first person ("I built...", "In my past team...") as a perfect response spoken directly by a candidate during an interview.`
-
-    const parsedSchema = zodToJsonSchema(interviewReportSchema);
+                    3. For both technical and behavioral fields, ensure the "sampleAnswer" is written dynamically in the first person ("I built...", "In my past team...") as a perfect response spoken directly by a candidate during an interview.`;
 
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseSchema: parsedSchema
+            responseSchema: getCleanSchema(interviewReportSchema)
         }
-    })
+    });
 
-    return JSON.parse(response.text)
+    return JSON.parse(response.text);
 }
 
-// Modified: Simply returns the AI generated professional HTML document layout directly
 async function generateResumePdf({ resume, selfDescription, jobDescription }) {
     const resumePdfSchema = z.object({
         html: z.string().describe("The complete HTML content of the beautifully styled professional resume document")
-    })
-
-    const parsedResumeSchema = zodToJsonSchema(resumePdfSchema);
+    });
 
     const prompt = `Generate a beautiful, highly professional resume for a candidate with the following details:
                     Resume: ${resume}
@@ -73,19 +76,19 @@ async function generateResumePdf({ resume, selfDescription, jobDescription }) {
                     Job Description: ${jobDescription}
 
                     The response should be a JSON object with a single field "html" containing a complete, fully inline-styled HTML page structure.
-                    Include elegant embedded CSS styling (clean fonts, professional margins, clear sections) so it looks like a premium resume when opened or printed.`
+                    Include elegant embedded CSS styling (clean fonts, professional margins, clear sections) so it looks like a premium resume when opened or printed.`;
 
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseSchema: parsedResumeSchema
+            responseSchema: getCleanSchema(resumePdfSchema)
         }
-    })
+    });
 
-    const jsonContent = JSON.parse(response.text)
-    return jsonContent.html; // Return the raw HTML string
+    const jsonContent = JSON.parse(response.text);
+    return jsonContent.html;
 }
 
-module.exports = { generateInterviewReport, generateResumePdf }
+module.exports = { generateInterviewReport, generateResumePdf };
