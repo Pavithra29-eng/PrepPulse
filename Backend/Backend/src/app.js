@@ -8,13 +8,19 @@ const app = express();
 // 1. Trust Proxy (Must be first for Render deployments)
 app.set("trust proxy", 1);
 
-// 2. Global CORS Package Settings
-app.use(cors({
+// 2. Global CORS Configuration (Handles Preflight & Request validation smoothly)
+const corsOptions = {
     origin: "https://preppulse-mu.vercel.app",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
-}));
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// Explicitly ensure all OPTIONS preflight requests return a clean 200 OK immediately
+app.options("*", cors(corsOptions));
 
 // 3. Body Parsers & Cookie Parser
 app.use(express.json());
@@ -34,8 +40,6 @@ app.use(session({
 
 // 5. Intercept Dead Frontend Auth Requests to avoid 404 header drops
 app.get("/api/auth/get-me", (req, res) => {
-    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
-    res.header("Access-Control-Allow-Credentials", "true");
     return res.status(200).json({ user: { id: "guest", username: "Guest User" } });
 });
 
@@ -45,16 +49,12 @@ app.use("/api/interview", interviewRouter);
 
 // 7. 404 handler for unmatched routes
 app.use((req, res) => {
-    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
-    res.header("Access-Control-Allow-Credentials", "true");
     res.status(404).json({ message: "Route not found" });
 });
 
 // 8. Centralized error handler
 app.use((err, req, res, next) => {
     console.error("Unhandled error:", err);
-    res.header("Access-Control-Allow-Origin", "https://preppulse-mu.vercel.app");
-    res.header("Access-Control-Allow-Credentials", "true");
 
     if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({ message: "Resume file is too large. Maximum allowed size is 3MB." });
