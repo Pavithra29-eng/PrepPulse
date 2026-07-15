@@ -11,13 +11,40 @@ async function generateInterViewReportController(req, res) {
             return res.status(400).json({ message: "Resume file upload is missing from request." });
         }
 
+        // Guard 1: make sure the uploaded file actually claims to be a PDF
+        if (req.file.mimetype !== "application/pdf") {
+            return res.status(400).json({
+                message: `Uploaded file must be a PDF. Received mimetype: ${req.file.mimetype}`
+            });
+        }
+
+        // Guard 2: make sure we actually received bytes
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+            return res.status(400).json({ message: "Uploaded file appears to be empty." });
+        }
+
         // Use standard pdf-parse handling directly on the file buffer
         let resumeText;
         try {
             const result = await pdfParse(req.file.buffer);
             resumeText = result.text;
+
+            // Guard 3: catch PDFs that "parse" successfully but contain no real text
+            // (common with scanned/image-only PDFs that have no text layer)
+            if (!resumeText || resumeText.trim().length < 20) {
+                return res.status(400).json({
+                    message: "The PDF didn't contain readable text. If this is a scanned document, please upload a text-based PDF instead."
+                });
+            }
         } catch (pdfError) {
-            console.error("PDF Parsing Inner Error:", pdfError);
+            // Log full error details server-side so we can see the real cause in Render logs
+            console.error("PDF Parsing Inner Error:", {
+                message: pdfError.message,
+                stack: pdfError.stack,
+                fileSize: req.file.buffer?.length,
+                mimetype: req.file.mimetype,
+                originalName: req.file.originalname
+            });
             return res.status(400).json({ message: "Failed to parse text from the uploaded PDF document." });
         }
 
